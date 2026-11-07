@@ -1,0 +1,6 @@
+{
+  "name": "Masakula ERP & PDV",
+  "description": "Sistema integrado de Gestão Empresarial e Ponto de Venda (PDV) Masakula adaptado para o mercado angolano em Kwanza (Kz).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

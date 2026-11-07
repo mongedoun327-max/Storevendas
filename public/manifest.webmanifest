@@ -1,0 +1,38 @@
+{
+  "id": "/",
+  "name": "Masakula ERP & PDV",
+  "short_name": "Masakula POS",
+  "description": "Sistema integrado de Gestão Comercial e Ponto de Venda (PDV) 100% Offline para Angola em Kwanzas (Kz).",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#131313",
+  "theme_color": "#E1FB15",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

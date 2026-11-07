@@ -1,0 +1,6 @@
+{
+  "summary": "Plano de implementação detalhado para ativação do banco de dados local com IndexedDB (Dexie) no Masakula ERP & PDV, com inicialização de dados demonstrativos e persistência autônoma offline.",
+  "updatedAt": "2026-10-15T19:52:58.844518759Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

@@ -1,0 +1,1 @@
+export { SmartProductImageUpload } from '../SmartProductImageUpload';

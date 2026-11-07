@@ -1,0 +1,6 @@
+{
+  "summary": "Plano de implementação abrangente para atualização de todas as telas do sistema Masakula de acordo com a Especificação Técnica Avançada v2.0: sistema de tokens estritos, neutralidade cromática (regra 95/3/2), eliminação de aninhamento recursivo, padronização monetária Kz, ergonomia de hardware (scanner e impressora de talões) e coerência determinística de estados.",
+  "updatedAt": "2026-10-18T17:21:50.082832344Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

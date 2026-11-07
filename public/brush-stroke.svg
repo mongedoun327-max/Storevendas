@@ -1,0 +1,91 @@
+<svg viewBox="0 0 600 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full preserve-3d">
+  <defs>
+    <filter id="brush-blur" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" result="noise" />
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+    <linearGradient id="brush-grad-light" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
+      <stop offset="50%" stopColor="#ffffff" stopOpacity="0.95" />
+      <stop offset="100%" stopColor="#ffffff" stopOpacity="0.8" />
+    </linearGradient>
+    <linearGradient id="brush-glow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stopColor="#E1FB15" stopOpacity="0.3" />
+      <stop offset="50%" stopColor="#ffffff" stopOpacity="0.2" />
+      <stop offset="100%" stopColor="#32D583" stopOpacity="0.3" />
+    </linearGradient>
+  </defs>
+  
+  {/* Glow sutil de fundo */}
+  <path
+    d="M 35,90 C 80,45 180,50 320,65 C 430,78 510,48 570,30 C 585,25 565,65 520,95 C 440,140 330,135 210,130 C 110,125 45,130 20,110 C 10,95 20,80 35,90 Z"
+    fill="url(#brush-glow)"
+    filter="blur(8px)"
+  />
+
+  {/* Traço Principal de Pincel Acrílico / Seco */}
+  <path
+    d="M 32,88 
+       C 45,82 60,78 78,74 
+       C 115,66 160,63 210,64 
+       C 275,65 340,71 405,68 
+       C 455,65 502,52 548,34 
+       C 562,28 575,22 585,18 
+       C 588,22 580,30 572,37 
+       C 555,51 532,68 512,81 
+       C 475,105 425,122 372,130 
+       C 315,138 250,139 190,136 
+       C 138,133 92,132 50,126 
+       C 35,124 22,118 16,108 
+       C 12,98 20,92 32,88 Z"
+    fill="currentColor"
+    opacity="0.92"
+  />
+
+  {/* Cerdas Superiores e Textura de Pincelada */}
+  <path
+    d="M 65,72 C 120,58 200,56 290,60 C 380,64 470,52 560,25 C 575,20 580,24 565,32 C 485,60 395,72 300,68 C 210,64 130,68 65,78 C 55,80 50,75 65,72 Z"
+    fill="currentColor"
+    opacity="0.75"
+  />
+  <path
+    d="M 120,56 C 220,50 340,58 460,42 C 510,35 550,24 578,16 C 582,18 574,25 550,33 C 440,52 320,58 200,60 C 150,61 115,60 120,56 Z"
+    fill="currentColor"
+    opacity="0.6"
+  />
+
+  {/* Cerdas e ranhuras na cauda da pincelada */}
+  <path
+    d="M 520,38 C 545,30 570,22 590,14 C 585,18 565,30 540,42 Z"
+    fill="currentColor"
+    opacity="0.85"
+  />
+  <path
+    d="M 500,52 C 530,40 560,30 582,24 C 576,28 550,42 520,58 Z"
+    fill="currentColor"
+    opacity="0.7"
+  />
+  <path
+    d="M 480,68 C 515,55 545,45 570,38 C 560,45 530,62 495,76 Z"
+    fill="currentColor"
+    opacity="0.65"
+  />
+
+  {/* Ranhuras inferiores e cerdas secas */}
+  <path
+    d="M 28,102 C 50,118 90,126 145,130 C 230,136 320,134 410,122 C 470,114 520,95 555,75 C 550,82 510,105 450,122 C 360,140 260,144 165,138 C 105,134 55,126 22,112 C 16,108 20,100 28,102 Z"
+    fill="currentColor"
+    opacity="0.8"
+  />
+  <path
+    d="M 45,120 C 110,134 200,142 300,140 C 400,138 480,120 535,92 C 525,100 465,128 375,142 C 275,146 175,142 80,130 C 50,126 35,122 45,120 Z"
+    fill="currentColor"
+    opacity="0.5"
+  />
+
+  {/* Manchas/gotas de tinta editorial nas pontas */}
+  <circle cx="12" cy="104" r="2.5" fill="currentColor" opacity="0.6" />
+  <circle cx="20" cy="116" r="1.8" fill="currentColor" opacity="0.4" />
+  <circle cx="586" cy="14" r="1.5" fill="currentColor" opacity="0.7" />
+  <circle cx="594" cy="22" r="2" fill="currentColor" opacity="0.5" />
+</svg>

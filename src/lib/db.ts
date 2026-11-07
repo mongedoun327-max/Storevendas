@@ -54,3 +54,9 @@ export class WorscoiDB extends Dexie {
 export const WorscoiPOSDatabase = WorscoiDB;
 export const db = new WorscoiDB();
 
+if (typeof window !== "undefined") {
+  db.open().catch((err) => {
+    console.warn("[Database] WorscoiPOSDB initial open notice (handled safely):", err);
+  });
+}
+

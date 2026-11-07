@@ -96,7 +96,8 @@ class HardwareIntegrationService {
 
     let buffer = '';
     let lastKeyTime = 0;
-    const TIME_THRESHOLD_MS = 45; // Intervalo rápido característico de lasers de código de barras
+    const KEY_THRESHOLD_MS = 80; // Intervalo rápido característico de lasers e leitores de código de barras
+    const ENTER_THRESHOLD_MS = 450; // Intervalo tolerado para o Enter final enviado pelo leitor
 
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -106,16 +107,11 @@ class HardwareIntegrationService {
       const diff = now - lastKeyTime;
       lastKeyTime = now;
 
-      // Se o tempo entre teclas for maior que o limiar de um scanner mecânico, reseta o buffer
-      if (diff > TIME_THRESHOLD_MS && buffer.length > 0) {
-        buffer = '';
-      }
-
+      // 1. Enter final do leitor de código de barras
       if (e.key === 'Enter') {
         const trimmed = buffer.trim();
         // A maioria dos códigos de fábrica (EAN-13, EAN-8, UPC, Code128) tem >= 3 caracteres
-        if (trimmed.length >= 3 && diff <= TIME_THRESHOLD_MS * 2.5) {
-          // Previne submissão acidental de formulários por causa do Enter final do scanner
+        if (trimmed.length >= 3 && diff <= ENTER_THRESHOLD_MS) {
           if (!isInput) {
             e.preventDefault();
           }
@@ -125,6 +121,12 @@ class HardwareIntegrationService {
         return;
       }
 
+      // 2. Se o tempo entre teclas normais for maior que o limiar do leitor, reinicia buffer
+      if (diff > KEY_THRESHOLD_MS && buffer.length > 0) {
+        buffer = '';
+      }
+
+      // 3. Captura caracteres imprimíveis do scanner
       if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
         buffer += e.key;
       }
@@ -254,6 +256,165 @@ class HardwareIntegrationService {
     return builder.build();
   }
 
+  private escapeHtml(str: string): string {
+    return str.replace(/[&<>'"]/g, (tag) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[tag] || tag));
+  }
+
+  // Gera o HTML estilizado em padrão térmico de 80mm ou 58mm
+  public renderReceiptHtml(data: HardwareReceiptData, paperWidth: '80mm' | '58mm' = '80mm'): string {
+    const widthCss = paperWidth === '58mm' ? '54mm' : '76mm';
+    const itemsHtml = data.items
+      .map(
+        item => `
+        <tr>
+          <td style="padding: 3px 0; text-align: left; vertical-align: top;">
+            <div style="font-weight: 600;">${this.escapeHtml(item.name)}</div>
+            <div style="font-size: 10px; color: #444;">${item.quantity} x ${item.price.toLocaleString('pt-AO')} Kz</div>
+          </td>
+          <td style="padding: 3px 0; text-align: right; font-weight: bold; vertical-align: top;">
+            ${item.subtotal.toLocaleString('pt-AO')} Kz
+          </td>
+        </tr>
+      `
+      )
+      .join('');
+
+    return `
+      <div id="printable-thermal-receipt" style="width: ${widthCss}; margin: 0 auto; font-family: 'Courier New', Courier, monospace; font-size: 11px; line-height: 1.25; color: #000; background: #fff; padding: 4mm;">
+        <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px;">
+          <h2 style="margin: 0; font-size: 14px; font-weight: bold; text-transform: uppercase;">${this.escapeHtml(data.companyName)}</h2>
+          <div style="font-size: 10px; font-weight: bold;">NIF: ${this.escapeHtml(data.nif || 'Consumidor Final')}</div>
+        </div>
+        <div style="font-size: 10px; border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px;">
+          <div><b>TALÃO/FATURA:</b> ${this.escapeHtml(data.invoiceNumber)}</div>
+          <div><b>DATA:</b> ${this.escapeHtml(data.date)}</div>
+          <div><b>OPERADOR:</b> ${this.escapeHtml(data.operatorName)}</div>
+          <div><b>CLIENTE:</b> ${this.escapeHtml(data.customerName || 'Consumidor Final')}</div>
+          ${data.customerNif ? `<div><b>NIF CLIENTE:</b> ${this.escapeHtml(data.customerNif)}</div>` : ''}
+        </div>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
+          <thead>
+            <tr style="border-bottom: 1px solid #000; font-size: 10px;">
+              <th style="text-align: left; padding-bottom: 3px;">QTD x ARTIGO</th>
+              <th style="text-align: right; padding-bottom: 3px;">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>${itemsHtml}</tbody>
+        </table>
+        <div style="border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px; font-size: 11px;">
+          <div style="display: flex; justify-content: space-between; font-size: 10px;">
+            <span>Subtotal:</span>
+            <span>${data.subtotal.toLocaleString('pt-AO')} Kz</span>
+          </div>
+          ${data.discount ? `
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: #444;">
+            <span>Desconto:</span>
+            <span>-${data.discount.toLocaleString('pt-AO')} Kz</span>
+          </div>` : ''}
+          <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin: 4px 0;">
+            <span>TOTAL:</span>
+            <span>${data.total.toLocaleString('pt-AO')} Kz</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 10px;">
+            <span>Pagamento:</span>
+            <span>${this.escapeHtml(data.paymentMethod)}</span>
+          </div>
+          ${data.amountPaid ? `
+          <div style="display: flex; justify-content: space-between; font-size: 10px;">
+            <span>Entregue:</span>
+            <span>${data.amountPaid.toLocaleString('pt-AO')} Kz</span>
+          </div>` : ''}
+          ${data.changeGiven ? `
+          <div style="display: flex; justify-content: space-between; font-size: 10px;">
+            <span>Troco:</span>
+            <span>${data.changeGiven.toLocaleString('pt-AO')} Kz</span>
+          </div>` : ''}
+        </div>
+        <div style="text-align: center; font-size: 9px; line-height: 1.3;">
+          <p style="margin: 0; font-weight: bold;">Obrigado pela preferência!</p>
+          <p style="margin: 2px 0 0 0; font-size: 8px;">Processado por programa certificado • Software Masakula PDV</p>
+        </div>
+      </div>
+    `;
+  }
+
+  // Imprime de forma limpa via iframe invisível ou container DOM garantido
+  private printHtmlContent(htmlContent: string): void {
+    if (typeof window === 'undefined') return;
+
+    // 1. Atualiza ou injeta elemento estático na página para compatibilidade com @media print
+    let container = document.getElementById('printable-thermal-receipt-dynamic');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'printable-thermal-receipt-dynamic';
+      document.body.appendChild(container);
+    }
+    container.innerHTML = htmlContent;
+
+    // 2. Tenta impressão limpa via iframe dedicado sem popup
+    try {
+      let iframe = document.getElementById('thermal-print-iframe') as HTMLIFrameElement | null;
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'thermal-print-iframe';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.visibility = 'hidden';
+        document.body.appendChild(iframe);
+      }
+
+      const doc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="UTF-8" />
+              <title>Talão Térmico</title>
+              <style>
+                @page { size: auto; margin: 0mm; }
+                body { margin: 0; padding: 0; background: #fff; }
+              </style>
+            </head>
+            <body>
+              ${htmlContent}
+            </body>
+          </html>
+        `);
+        doc.close();
+
+        setTimeout(() => {
+          try {
+            iframe?.contentWindow?.focus();
+            iframe?.contentWindow?.print();
+          } catch {
+            window.print();
+          }
+        }, 250);
+        return;
+      }
+    } catch {
+      // Fallback padrão se iframe for restrito
+    }
+
+    document.body.classList.add('printing-thermal');
+    window.print();
+    setTimeout(() => {
+      document.body.classList.remove('printing-thermal');
+    }, 500);
+  }
+
   // Dispara a impressão na maquininha
   public async printReceipt(data: HardwareReceiptData, paperWidth: '80mm' | '58mm' = '80mm'): Promise<{ success: boolean; method: 'serial' | 'system'; message: string }> {
     // 1. Tentar imprimir diretamente na maquininha via Web Serial se conectada
@@ -273,13 +434,10 @@ class HardwareIntegrationService {
       }
     }
 
-    // 2. Fallback de alta fidelidade: layout térmico (80mm/58mm)
+    // 2. Fallback de alta fidelidade: layout térmico (80mm/58mm) renderizado e impresso sem falhas
     try {
-      document.body.classList.add('printing-thermal');
-      window.print();
-      setTimeout(() => {
-        document.body.classList.remove('printing-thermal');
-      }, 500);
+      const receiptHtml = this.renderReceiptHtml(data, paperWidth);
+      this.printHtmlContent(receiptHtml);
 
       return {
         success: true,
@@ -296,7 +454,7 @@ class HardwareIntegrationService {
   }
 
   // Teste de impressão na maquininha
-  public async printTestSlip(): Promise<{ success: boolean; message: string }> {
+  public async printTestSlip(paperWidth: '80mm' | '58mm' = '80mm'): Promise<{ success: boolean; message: string }> {
     const testData: HardwareReceiptData = {
       companyName: 'Masakula ERP & PDV',
       nif: '5417082910',
@@ -308,21 +466,27 @@ class HardwareIntegrationService {
         {
           name: 'Comunicação Maquininha Térmica',
           quantity: 1,
+          price: 1500,
+          subtotal: 1500
+        },
+        {
+          name: 'Teste de Corte e Alinhamento',
+          quantity: 1,
           price: 0,
           subtotal: 0
         }
       ],
-      subtotal: 0,
-      total: 0,
+      subtotal: 1500,
+      total: 1500,
       paymentMethod: 'Teste Físico ESC/POS'
     };
 
-    const res = await this.printReceipt(testData);
+    const res = await this.printReceipt(testData, paperWidth);
     return {
       success: res.success,
       message: res.method === 'serial' 
         ? 'Talão de teste enviado via porta serial para a maquininha!' 
-        : 'Diálogo de impressão térmica acionado com sucesso!'
+        : 'Talão de teste enviado com sucesso para a impressora térmica!'
     };
   }
 }

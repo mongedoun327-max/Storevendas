@@ -49,7 +49,9 @@ import {
   saveStoredCashMovements,
   loadStoredSettings,
   saveStoredSettings,
-  resetToBlankSystem
+  resetToBlankSystem,
+  reconcileStorageWithIndexedDB,
+  requestPersistentStorage
 } from '../../utils/storage';
 import { supabase } from '../../lib/supabase';
 import { supabaseService } from '../../services/supabaseService';
@@ -190,22 +192,27 @@ export const AppShell: React.FC<AppShellProps> = ({
   const [cashMovements, setCashMovements] = useState<CashMovement[]>(() => loadStoredCashMovements());
   const [settings, setSettings] = useState<CompanySettings>(() => loadStoredSettings());
 
-  // Clean Slate Initialization (Folha em Branco - sessão nova sem dados pré-carregados)
+  // Database Integrity & Resilience: Solicita armazenamento persistente e reconcilia com IndexedDB
   useEffect(() => {
     try {
-      const isBlanked = localStorage.getItem('masakula_clean_slate_session_v7');
-      if (!isBlanked) {
-        resetToBlankSystem();
-        setProducts([]);
-        setWorkOrders([]);
-        setCustomers([]);
-        setSales([]);
-        setExpenses([]);
-        setActiveCashSession(null);
-        setCashMovements([]);
-      }
+      requestPersistentStorage().catch(() => {});
+      localStorage.setItem('masakula_clean_slate_session_v7', 'done');
+
+      // Se o localStorage estiver vazio de produtos ou vendas, resgata do IndexedDB
+      reconcileStorageWithIndexedDB().then((res) => {
+        if (res.recoveredProducts > 0) {
+          const restored = loadStoredProducts();
+          if (restored.length > 0) setProducts(restored);
+        }
+        if (res.recoveredSales > 0) {
+          const restoredSales = loadStoredSales();
+          if (restoredSales.length > 0) setSales(restoredSales);
+        }
+      }).catch((err) => {
+        console.warn('Reconcile storage notice:', err);
+      });
     } catch (e) {
-      console.warn('Clean slate check notice:', e);
+      console.warn('Database resilience notice:', e);
     }
   }, []);
 

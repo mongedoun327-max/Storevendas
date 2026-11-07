@@ -16,13 +16,6 @@ function escapeHtml(value: string): string {
 export function printThermalReceipt(receiptData: SaleReceiptData): void {
   if (typeof window === "undefined") return;
 
-  const printWindow = window.open("", "_blank", "width=400,height=600");
-
-  if (!printWindow) {
-    window.alert("Por favor, permita pop-ups para imprimir o recibo.");
-    return;
-  }
-
   const itemsHtml = receiptData.items
     .map(
       (item) => `
@@ -116,18 +109,45 @@ export function printThermalReceipt(receiptData: SaleReceiptData): void {
           <p style="margin: 0;"><b>Obrigado pela preferência!</b></p>
           <p style="margin: 2px 0 0 0; font-size: 8px;">Processado por programa certificado nº 000/AGT</p>
         </div>
-
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
-          };
-        </script>
       </body>
     </html>
   `;
 
-  printWindow.document.open();
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
+  try {
+    let iframe = document.getElementById("thermal-print-iframe") as HTMLIFrameElement | null;
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.id = "thermal-print-iframe";
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.style.visibility = "hidden";
+      document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (doc) {
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+
+      setTimeout(() => {
+        try {
+          iframe?.contentWindow?.focus();
+          iframe?.contentWindow?.print();
+        } catch {
+          window.print();
+        }
+      }, 250);
+      return;
+    }
+  } catch (err) {
+    console.warn("Erro ao imprimir via iframe:", err);
+  }
+
+  // Fallback caso a manipulação de iframe falhe
+  window.print();
 }

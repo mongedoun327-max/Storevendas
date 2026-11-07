@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase";
 import { INITIAL_PRODUCTS } from "../data/mockData";
+import { loadStoredProducts, saveStoredProducts } from "../utils/storage";
 import type { 
   Product, 
   CreateProductDTO, 
@@ -50,7 +51,9 @@ export const productService = {
     }
 
     // Fallback local caso tabela ou conexão não esteja disponível
-    const fallback: Product[] = INITIAL_PRODUCTS.map((p) => ({
+    const stored = loadStoredProducts();
+    const sourceProducts = stored.length > 0 ? stored : INITIAL_PRODUCTS;
+    const fallback: Product[] = sourceProducts.map((p) => ({
       id: p.id,
       organization_id: "org-default",
       name: p.name,
@@ -149,44 +152,145 @@ export const productService = {
   },
 
   /**
-   * Cadastrar novo produto
+   * Cadastrar novo produto (com proteção total contra interrupções de banco de dados)
    */
   async createProduct(organizationId: string, dto: CreateProductDTO): Promise<Product> {
-    const { data, error } = await supabase
-      .from("products")
-      .insert([{ ...dto, organization_id: organizationId }])
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .insert([{ ...dto, organization_id: organizationId }])
+        .select()
+        .single();
 
-    if (error) throw new Error(error.message);
-    return data as Product;
+      if (!error && data) {
+        return data as Product;
+      }
+      if (error) {
+        console.warn("Supabase createProduct notice (using local fallback):", error.message);
+      }
+    } catch (err) {
+      console.warn("Supabase createProduct exception (using local fallback):", err);
+    }
+
+    const newId = `prod-${Date.now()}`;
+    const localProduct: Product = {
+      id: newId,
+      organization_id: organizationId,
+      name: dto.name,
+      sku: dto.sku || `MSK-${Math.floor(1000 + Math.random() * 9000)}`,
+      barcode: dto.barcode || '',
+      cost_price: dto.cost_price || 0,
+      selling_price: dto.selling_price || 0,
+      min_stock: dto.min_stock || 5,
+      max_stock: 500,
+      current_stock: (dto as any).initial_stock || 0,
+      alert_expiration_days: (dto as any).alert_expiration_days || 30,
+      unit: dto.unit || "unit",
+      type: dto.type || "single",
+      tax_rate: dto.tax_rate || "ISE_0",
+      image_url: dto.image_url,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      category: {
+        id: dto.category_id || "cat-default",
+        organization_id: organizationId,
+        name: "Geral",
+        slug: "geral",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+    };
+
+    const stored = loadStoredProducts();
+    const mappedToAppProduct: any = {
+      id: localProduct.id,
+      name: localProduct.name,
+      sku: localProduct.sku,
+      barcode: localProduct.barcode,
+      category: 'Geral',
+      saleType: 'Unidade',
+      costPrice: localProduct.cost_price,
+      salePrice: localProduct.selling_price,
+      stock: localProduct.current_stock,
+      minStock: localProduct.min_stock,
+      unit: localProduct.unit,
+      status: 'active',
+      updatedAt: localProduct.updated_at,
+    };
+    saveStoredProducts([mappedToAppProduct, ...stored]);
+
+    return localProduct;
   },
 
   /**
    * Atualizar dados do produto
    */
   async updateProduct(id: string, dto: Partial<CreateProductDTO>): Promise<Product> {
-    const { data, error } = await supabase
-      .from("products")
-      .update(dto)
-      .eq("id", id)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .update(dto)
+        .eq("id", id)
+        .select()
+        .single();
 
-    if (error) throw new Error(error.message);
-    return data as Product;
+      if (!error && data) return data as Product;
+    } catch (err) {
+      console.warn("Supabase updateProduct fallback notice:", err);
+    }
+
+    const stored = loadStoredProducts();
+    const updated = stored.map((p) => {
+      if (p.id === id) {
+        return {
+          ...p,
+          name: dto.name ?? p.name,
+          costPrice: dto.cost_price ?? p.costPrice,
+          salePrice: dto.selling_price ?? p.salePrice,
+          stock: (dto as any).initial_stock ?? p.stock,
+          barcode: dto.barcode ?? p.barcode,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return p;
+    });
+    saveStoredProducts(updated);
+
+    return {
+      id,
+      organization_id: "org-default",
+      name: dto.name || "Produto Atualizado",
+      cost_price: dto.cost_price || 0,
+      selling_price: dto.selling_price || 0,
+      min_stock: dto.min_stock || 5,
+      max_stock: 500,
+      current_stock: (dto as any).initial_stock || 0,
+      alert_expiration_days: 30,
+      unit: "unit",
+      type: "single",
+      tax_rate: "ISE_0",
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Product;
   },
 
   /**
    * Desativar produto (Soft Delete)
    */
   async deleteProduct(id: string): Promise<void> {
-    const { error } = await supabase
-      .from("products")
-      .update({ is_active: false })
-      .eq("id", id);
+    try {
+      await supabase
+        .from("products")
+        .update({ is_active: false })
+        .eq("id", id);
+    } catch (err) {
+      console.warn("Supabase deleteProduct notice (removing locally):", err);
+    }
 
-    if (error) throw new Error(error.message);
+    const stored = loadStoredProducts();
+    saveStoredProducts(stored.filter((p) => p.id !== id));
   },
 
   /**

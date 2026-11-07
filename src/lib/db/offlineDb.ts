@@ -61,3 +61,9 @@ export class POSOfflineDatabase extends Dexie {
 }
 
 export const offlineDb = new POSOfflineDatabase();
+
+if (typeof window !== "undefined") {
+  offlineDb.open().catch((err) => {
+    console.warn("[Database] WorscoiPOS_OfflineDB initial open notice (handled safely):", err);
+  });
+}

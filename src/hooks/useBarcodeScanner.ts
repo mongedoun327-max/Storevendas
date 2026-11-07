@@ -9,7 +9,7 @@ interface BarcodeScannerOptions {
 
 export function useBarcodeScanner({
   onScan,
-  timeThreshold = 35,
+  timeThreshold = 80,
   minLength = 3,
   ignoreInputs = true,
 }: BarcodeScannerOptions) {
@@ -35,20 +35,24 @@ export function useBarcodeScanner({
       const timeDiff = currentTime - lastKeyTimeRef.current;
       lastKeyTimeRef.current = currentTime;
 
-      if (timeDiff > timeThreshold && bufferRef.current.length > 0) {
-        bufferRef.current = "";
-      }
-
       if (event.key === "Enter") {
-        if (bufferRef.current.length >= minLength) {
+        // Scanners podem pausar até 450ms antes do Enter final
+        if (bufferRef.current.length >= minLength && timeDiff <= 450) {
           event.preventDefault();
-          onScanRef.current(bufferRef.current);
+          const scanned = bufferRef.current.trim();
+          if (scanned.length >= minLength) {
+            onScanRef.current(scanned);
+          }
         }
         bufferRef.current = "";
         return;
       }
 
-      if (event.key.length === 1) {
+      if (timeDiff > timeThreshold && bufferRef.current.length > 0) {
+        bufferRef.current = "";
+      }
+
+      if (event.key && event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
         bufferRef.current += event.key;
       }
     };

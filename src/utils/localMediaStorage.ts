@@ -26,6 +26,12 @@ class POSMediaDatabase extends Dexie {
 
 export const mediaDb = new POSMediaDatabase();
 
+if (typeof window !== "undefined") {
+  mediaDb.open().catch((err) => {
+    console.warn("[Database] WorscoiPOS_MediaDB initial open notice (handled safely):", err);
+  });
+}
+
 /**
  * Client-Side Canvas WebP Compression Engine
  * 100% offline, zero network, zero external libraries.

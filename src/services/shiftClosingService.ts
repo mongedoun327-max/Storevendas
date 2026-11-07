@@ -1,4 +1,10 @@
 import { supabase } from '../lib/supabase';
+import { 
+  loadStoredCashSession, 
+  saveStoredCashSession, 
+  loadStoredSales, 
+  loadStoredCashMovements 
+} from '../utils/storage';
 
 export interface CloseShiftDTO {
   shift_id: string;
@@ -45,59 +51,108 @@ export const shiftClosingService = {
         };
       }
 
-      // 1. Obter dados do turno atual
-      const { data: shift, error: shiftErr } = await supabase
-        .from("shifts")
-        .select("*")
-        .eq("id", shift_id)
-        .single();
+      // 1. Obter dados do turno atual (remoto ou local)
+      let activeShift: any = null;
+      try {
+        const { data: shift, error: shiftErr } = await supabase
+          .from("shifts")
+          .select("*")
+          .eq("id", shift_id)
+          .single();
 
-      if (shiftErr || !shift || shift.status !== "OPEN") {
-        return {
-          success: false,
-          error: "Turno não encontrado ou já encerrado."
-        };
+        if (!shiftErr && shift && shift.status === "OPEN") {
+          activeShift = shift;
+        }
+      } catch (err) {
+        console.warn("Verificação remota de turno falhou, checando local:", err);
+      }
+
+      const localSession = loadStoredCashSession();
+      if (!activeShift) {
+        if (localSession && localSession.status === "OPEN") {
+          activeShift = {
+            id: localSession.id || shift_id,
+            operator_id: (localSession as any).operator_name || (localSession as any).openedBy || "op-01",
+            status: "OPEN",
+            opened_at: (localSession as any).opened_at || (localSession as any).openedAt || new Date().toISOString(),
+            initial_cash: (localSession as any).initial_amount || (localSession as any).openingAmount || 0,
+          };
+        } else {
+          return {
+            success: false,
+            error: "Turno não encontrado ou já encerrado."
+          };
+        }
       }
 
       // 2. Somar total de vendas do turno por método de pagamento
-      const { data: sales, error: salesErr } = await supabase
-        .from("sales")
-        .select("payment_method, total_amount")
-        .eq("shift_id", shift_id)
-        .eq("status", "COMPLETED");
+      let salesCash = 0;
+      let salesCard = 0;
+      try {
+        const { data: sales, error: salesErr } = await supabase
+          .from("sales")
+          .select("payment_method, total_amount")
+          .eq("shift_id", shift_id)
+          .eq("status", "COMPLETED");
 
-      if (salesErr) {
-        console.warn("Aviso ao buscar vendas do turno:", salesErr);
+        if (!salesErr && sales && sales.length > 0) {
+          salesCash = sales
+            .filter(s => s.payment_method === "CASH")
+            .reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0);
+
+          salesCard = sales
+            .filter(s => s.payment_method === "CARD" || s.payment_method === "MULTICAIXA" || s.payment_method === "TPA")
+            .reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0);
+        }
+      } catch (err) {
+        console.warn("Aviso ao buscar vendas remotas do turno:", err);
       }
 
-      const salesCash = (sales || [])
-        .filter(s => s.payment_method === "CASH")
-        .reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0);
-
-      const salesCard = (sales || [])
-        .filter(s => s.payment_method === "CARD" || s.payment_method === "MULTICAIXA" || s.payment_method === "TPA")
-        .reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0);
+      // Se não obteve vendas remotas, calcula a partir das vendas locais
+      if (salesCash === 0 && salesCard === 0) {
+        const localSales = loadStoredSales();
+        salesCash = localSales
+          .filter(s => s.paymentMethod === 'cash')
+          .reduce((acc, curr) => acc + (curr.total || 0), 0);
+        salesCard = localSales
+          .filter(s => s.paymentMethod === 'multicaixa' || s.paymentMethod === 'express' || s.paymentMethod === 'transfer')
+          .reduce((acc, curr) => acc + (curr.total || 0), 0);
+      }
 
       // 3. Somar movimentações (Sangrias e Reforços)
-      const { data: movements, error: movErr } = await supabase
-        .from("cash_movements")
-        .select("type, amount")
-        .eq("shift_id", shift_id);
+      let totalSangria = 0;
+      let totalReforco = 0;
+      try {
+        const { data: movements, error: movErr } = await supabase
+          .from("cash_movements")
+          .select("type, amount")
+          .eq("shift_id", shift_id);
 
-      if (movErr) {
-        console.warn("Aviso ao buscar movimentações do turno:", movErr);
+        if (!movErr && movements && movements.length > 0) {
+          totalSangria = movements
+            .filter(m => m.type === "SANGRIA")
+            .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+          totalReforco = movements
+            .filter(m => m.type === "REFORCO")
+            .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+        }
+      } catch (err) {
+        console.warn("Aviso ao buscar movimentações remotas do turno:", err);
       }
 
-      const totalSangria = (movements || [])
-        .filter(m => m.type === "SANGRIA")
-        .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
-
-      const totalReforco = (movements || [])
-        .filter(m => m.type === "REFORCO")
-        .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+      if (totalSangria === 0 && totalReforco === 0) {
+        const localMovements = loadStoredCashMovements();
+        totalSangria = localMovements
+          .filter(m => (m.type as string) === 'SANGRIA' || (m.type as string) === 'withdrawal')
+          .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+        totalReforco = localMovements
+          .filter(m => (m.type as string) === 'REFORCO' || (m.type as string) === 'SUPRIMENTO' || (m.type as string) === 'deposit')
+          .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+      }
 
       // 4. Executar os cálculos do Relatório Z
-      const initialCash = Number(shift.initial_cash || 0);
+      const initialCash = Number(activeShift.initial_cash || 0);
       const expectedCash = initialCash + salesCash + totalReforco - totalSangria;
       const actualCashNum = typeof actual_cash === "number" ? actual_cash : parseFloat(String(actual_cash));
 
@@ -110,29 +165,33 @@ export const shiftClosingService = {
 
       const difference = actualCashNum - expectedCash;
 
-      // 5. Persistir encerramento no banco de dados
+      // 5. Persistir encerramento (remoto com fallback local)
       const closedAt = new Date().toISOString();
-      const { data: updatedShift, error: updateErr } = await supabase
-        .from("shifts")
-        .update({
-          status: "CLOSED",
-          closed_at: closedAt,
-          closed_by_id: closed_by_id || null,
-          sales_cash: salesCash,
-          sales_card: salesCard,
-          total_sangria: totalSangria,
-          total_reforco: totalReforco,
-          expected_cash: expectedCash,
-          actual_cash: actualCashNum,
-          difference: difference,
-        })
-        .eq("id", shift_id)
-        .select()
-        .single();
+      let isRemoteUpdated = false;
+      try {
+        const { error: updateErr } = await supabase
+          .from("shifts")
+          .update({
+            status: "CLOSED",
+            closed_at: closedAt,
+            closed_by_id: closed_by_id || null,
+            sales_cash: salesCash,
+            sales_card: salesCard,
+            total_sangria: totalSangria,
+            total_reforco: totalReforco,
+            expected_cash: expectedCash,
+            actual_cash: actualCashNum,
+            difference: difference,
+          })
+          .eq("id", shift_id);
 
-      if (updateErr) {
-        throw updateErr;
+        if (!updateErr) isRemoteUpdated = true;
+      } catch (remUpdateErr) {
+        console.warn("Encerramento remoto falhou (mantido local):", remUpdateErr);
       }
+
+      // Fecha a sessão local
+      saveStoredCashSession(null);
 
       // Obter nome do operador para a mensagem / e-mail
       let operatorName = "Operador";
@@ -140,7 +199,7 @@ export const shiftClosingService = {
         const { data: operator } = await supabase
           .from("operators")
           .select("name")
-          .eq("id", updatedShift.operator_id)
+          .eq("id", activeShift.operator_id)
           .single();
 
         if (operator?.name) {
@@ -151,11 +210,11 @@ export const shiftClosingService = {
       }
 
       const reportPayload = {
-        shiftId: updatedShift.id,
-        operatorId: updatedShift.operator_id,
+        shiftId: activeShift.id,
+        operatorId: activeShift.operator_id || "op-01",
         operatorName,
-        openedAt: updatedShift.opened_at,
-        closedAt: updatedShift.closed_at,
+        openedAt: activeShift.opened_at,
+        closedAt: closedAt,
         initialCash,
         salesCash,
         salesCard,

@@ -40,3 +40,9 @@ class WorscoiPOSDatabase extends Dexie {
 }
 
 export const db = new WorscoiPOSDatabase();
+
+if (typeof window !== "undefined") {
+  db.open().catch((err) => {
+    console.warn("[Database] WorscoiPOS_DB initial open notice (handled safely):", err);
+  });
+}

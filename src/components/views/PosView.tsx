@@ -628,13 +628,13 @@ export const PosView: React.FC<PosViewProps> = ({
     let lastKeyTime = 0;
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // 1. Process Hardware Barcode Scanner Wedge (Burst input < 50ms)
+      // 1. Process Hardware Barcode Scanner Wedge (Burst input standard for USB/Bluetooth)
       const now = Date.now();
       const interval = now - lastKeyTime;
       lastKeyTime = now;
 
       if (e.key === 'Enter') {
-        if (barcodeBuffer.length >= 3 && interval < 60) {
+        if (barcodeBuffer.length >= 3 && interval <= 450) {
           const code = barcodeBuffer.trim();
           barcodeBuffer = '';
           const match = products.find(p => p.barcode === code) ||
@@ -648,7 +648,7 @@ export const PosView: React.FC<PosViewProps> = ({
         }
         barcodeBuffer = '';
       } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        if (interval > 60) {
+        if (interval > 80) {
           barcodeBuffer = e.key;
         } else {
           barcodeBuffer += e.key;

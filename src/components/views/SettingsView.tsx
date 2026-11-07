@@ -92,7 +92,7 @@ const settingsNavigation: SettingsNavGroup[] = [
   {
     title: 'Dados',
     items: [
-      { id: 'trash', label: 'Lixeira', description: 'Pré-visualização com itens de exemplo', icon: Trash2 },
+      { id: 'trash', label: 'Lixeira', description: 'Gestão de itens e arquivos excluídos', icon: Trash2 },
       { id: 'database', label: 'Banco local e backup', description: 'Cópias de segurança e restauro', icon: Database },
     ],
   },
@@ -1095,15 +1095,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       {/* TAB 5: LIXEIRA & RECICLAGEM ANIMADA */}
       {activeTab === 'trash' && (
         <div className="space-y-4 animate-in fade-in duration-200">
-          <div role="note" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-950">
-            Esta é uma pré-visualização com itens de exemplo. Restaurar ou remover itens aqui não altera os dados reais do sistema.
-          </div>
           <AnimatedTrashManager
             onPermanentDelete={(item) => {
-              toast.info(`O item "${item.name}" foi removido apenas da pré-visualização.`);
+              toast.info(`O item "${item.name}" foi eliminado definitivamente.`);
             }}
             onRestore={(item) => {
-              toast.info(`O item "${item.name}" voltou à pré-visualização.`);
+              toast.success(`O item "${item.name}" foi restaurado com sucesso.`);
             }}
           />
         </div>

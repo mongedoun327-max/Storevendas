@@ -63,7 +63,7 @@ export const HardwareDevicesModal: React.FC<HardwareDevicesModalProps> = ({
   const handleTestPrint = async () => {
     setIsTestingPrinter(true);
     try {
-      const res = await hardwareService.printTestSlip();
+      const res = await hardwareService.printTestSlip(paperWidth);
       if (res.success) {
         toast.success(res.message);
       } else {
